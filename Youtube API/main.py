@@ -62,7 +62,7 @@ Last line concatenates the Video data from all channels
 '''
 for c in channel_data['channelName'].unique():
     print("Getting video information from channel: " + c)
-    playlist_id = channel_data.loc[channel_data['channelName'] == c, 'playlistId'].iloc[0]
+    playlist_id = channel_data.loc[channel_data['channelName'] == c, '_playlistId'].iloc[0]
     video_ids = channel_metrics.get_video_ids(playlist_id)
     # Get video data for the current channel efficiently
     current_video_data = video_metrics.get_video_details(video_ids)

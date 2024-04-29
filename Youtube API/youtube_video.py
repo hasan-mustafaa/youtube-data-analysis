@@ -152,3 +152,6 @@ class YoutubeVideo:
                 print('Could not get comments for video ' + video_id)
 
         return pd.DataFrame(all_comments)
+
+
+    #get video format

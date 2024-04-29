@@ -21,7 +21,7 @@ class YoutubeChannel:
     - `get_channel_stats(self, channel_ids)`: Retrieves channel statistics (title, subscriber count, view count, video count, upload playlist ID) for a given list of channel IDs. Returns a Pandas DataFrame containing the data.
     - `get_video_ids(self, playlist_id)`: Retrieves a list of video IDs from a given playlist ID.
     """
-    def __init__(self, youtube, channel_ids=None, channelName=None, subscribers=None, view=None, totalVideos=None,
+    def __init__(self, youtube=None, channel_ids=None, channelName=None, subscribers=None, view=None, totalVideos=None,
                  playlistId=None):
         """
         Initializes the YoutubeChannel object.
@@ -81,14 +81,14 @@ class YoutubeChannel:
         response = request.execute()
 
         for i in range(len(response['items'])):
-            data = dict(channelName=response['items'][i]['snippet']['title'],
-                        subscribers=response['items'][i]['statistics']['subscriberCount'],
-                        views=response['items'][i]['statistics']['viewCount'],
-                        totalVideos=response['items'][i]['statistics']['videoCount'],
-                        playlistId=response['items'][i]['contentDetails']['relatedPlaylists']['uploads'])
+            data = YoutubeChannel(channelName=response['items'][i]['snippet']['title'],
+                                  subscribers=response['items'][i]['statistics']['subscriberCount'],
+                                  view=response['items'][i]['statistics'],
+                                  totalVideos=response['items'][i]['statistics']['videoCount'],
+                                  playlistId=response['items'][i]['contentDetails']['relatedPlaylists']['uploads'])
             all_data.append(data)
 
-        return pd.DataFrame(all_data)
+        return pd.DataFrame([vars(p) for p in all_data])
 
     def get_video_ids(self, playlist_id):
         """
