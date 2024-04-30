@@ -14,7 +14,6 @@ from googleapiclient.discovery import build
 from youtube_channel import YoutubeChannel
 from youtube_video import YoutubeVideo
 
-
 api_key = 'AIzaSyAUQfbrbRO2VDhHLuQcfVBTk6QQKmyHiPs'
 
 # Channel Ids to be analysed
@@ -37,22 +36,27 @@ video_metrics = YoutubeVideo(youtube)
 # Uses a method from the class, to retrieve statistics using the channel id's in the array
 channel_data = channel_metrics.get_channel_stats(channel_ids)
 
-# Convert count columns which were originally contain string values to numeric columns which is required for analysis
-numeric_cols = ['subscribers', 'views', 'totalVideos']
-channel_data[numeric_cols] = channel_data[numeric_cols].apply(pd.to_numeric, errors='coerce') #String to Numeric(Either Int or Float)
-
-# Tells us which playbutton they might have using comparisons
-subscribers_per_hundredk = channel_data['subscribers'] // 100000
-channel_data['subscribers_per_hundredk'] = subscribers_per_hundredk
+# Understand how it works
+for position, series in channel_data.iterrows():
+    # Converts row to dictionary, and creates a Youtube Channel instance
+    channel_instance = YoutubeChannel(
+        youtube=youtube,
+        channelName=series['channelName'],
+        subscribers=series['subscribers'],
+        view=series['view'],
+        totalVideos=series['totalVideos'],
+        playlistId=series['_playlistId']
+    )
+    # Now subscriberss per hundredk can be calculated
+    channel_instance.calculate_subscribers_per_hundredk()
+    channel_data.at[position, 'subscribers_per_hundredk'] = channel_instance.subscribers_per_hundredk
 
 # Converts the data from channel_data to a csv
 channel_data.to_csv('channel_data.csv', index=False)
 print(channel_data)
 
-
 # Create a dataframe with video statistics and comments from all channels
 video_df = pd.DataFrame()  # Create an empty DataFrame for cumulative results
-
 
 '''
 Loops through each unique channel name in the channel name column. It outputs the name of the channel being processed.
@@ -60,44 +64,42 @@ Retrives the playlist_id of each channel  then passed it through a method which 
 It then uses the video_ids to find details of each video, e.g. Description, Views etc
 Last line concatenates the Video data from all channels
 '''
-for c in channel_data['channelName'].unique():
-    print("Getting video information from channel: " + c)
-    playlist_id = channel_data.loc[channel_data['channelName'] == c, 'playlistId'].iloc[0]
+
+for channel in channel_data['channelName'].unique():
+    print("Getting video information from channel: " + channel)
+    playlist_id = channel_data.loc[channel_data['channelName'] == channel, '_playlistId'].iloc[0]
     video_ids = channel_metrics.get_video_ids(playlist_id)
     # Get video data for the current channel efficiently
     current_video_data = video_metrics.get_video_details(video_ids)
     # Concatenate the current video data with the cumulative DataFrame
     video_df = pd.concat([video_df, current_video_data], ignore_index=True)
 
-# Converts column with string representation to numeric for analysis
-cols = ['viewCount', 'likeCount', 'favoriteCount', 'commentCount']
-video_df[cols] = video_df[cols].apply(pd.to_numeric, errors='coerce', axis=1) #String to Numeric
-
-# Create publish day (in the week) column
-'''
-First line parses timestamps into datetime objects representing date and time of video publications
-Second line, creates a new column and extracts the day of the week that it was published
-'''
-video_df['publishedAt'] = video_df['publishedAt'].apply(lambda x: parser.parse(x)) #String to Datetime
-video_df['pushblishDayName'] = video_df['publishedAt'].apply(lambda x: x.strftime("%A"))
-
-# Convert duration to seconds
-'''
-First line parses the string of duration e.g. 'PT6M49S' into Pandas TimeDelta Datetime. 
-Second line parsed durations to specific units of seconds
-'''
-video_df['durationSecs'] = video_df['duration'].apply(lambda x: isodate.parse_duration(x))
-video_df['durationSecs'] = video_df['durationSecs'].astype('timedelta64[s]') #String to Pandas TimeDelta Datetime
-
-# Add number of tags
-video_df['tagsCount'] = video_df['tags'].apply(lambda x: 0 if x is None else len(x))
-
-# Comments and likes per 1000 view ratio
-video_df['likeRatio'] = video_df['likeCount'] / video_df['viewCount'] * 1000
-video_df['commentRatio'] = video_df['commentCount'] / video_df['viewCount'] * 1000
-
-# Title character length
-video_df['titleLength'] = video_df['title'].apply(lambda x: len(x)) #Converting String to Integer
+for position, series in video_df.iterrows():
+    video_instance = YoutubeVideo(
+        youtube=youtube,
+        channelTitle=series['channelTitle'],
+        title=series['title'],
+        description=series['description'],
+        tags=series['tags'], # Gracefully handles where there is no value
+        publishedAt=series['publishedAt'],
+        viewCount=series['viewCount'],
+        likeCount=series['likeCount'], # Gracefully handles where there is no value
+        favoriteCount=series['favoriteCount'],
+        commentCount=series['commentCount'], # Gracefully handles where there is no value
+        duration=series['duration'],
+        definition=series['definition'],
+        caption=series['caption']
+    )
+    video_instance.calculate_duration_seconds()
+    video_df.at[position, 'durationSecs'] = video_instance.durationSecs
+    video_instance.calculate_tags_count()
+    video_df.at[position, 'tagsCount'] = video_instance.tagCount
+    video_instance.calculate_like_ratio()
+    video_df.at[position, 'likeRatio'] = video_instance.likeRatio
+    video_instance.calculate_comment_ratio()
+    video_df.at[position, 'commentRatio'] = video_instance.commentRatio
+    video_instance.calculate_title_length()
+    video_df.at[position, 'titleLength'] = video_instance.titleLength
 
 # Output the DataFrame directly
 print(video_df)

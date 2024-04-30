@@ -21,7 +21,8 @@ class YoutubeChannel:
     - `get_channel_stats(self, channel_ids)`: Retrieves channel statistics (title, subscriber count, view count, video count, upload playlist ID) for a given list of channel IDs. Returns a Pandas DataFrame containing the data.
     - `get_video_ids(self, playlist_id)`: Retrieves a list of video IDs from a given playlist ID.
     """
-    def __init__(self, youtube, channel_ids=None, channelName=None, subscribers=None, view=None, totalVideos=None,
+
+    def __init__(self, youtube=None, channel_ids=None, channelName=None, subscribers=None, view=None, totalVideos=None,
                  playlistId=None):
         """
         Initializes the YoutubeChannel object.
@@ -36,11 +37,12 @@ class YoutubeChannel:
         - `totalVideos` (str, optional): Total number of videos uploaded by the channel.
         - `playlistId` (str, optional): ID of the channel's upload playlist.
         """
+        self.subscribers_per_hundredk = None
         self._youtube = youtube  # Required to make requests to the API, modification could cause the program to stop running
         self._channel_ids = channel_ids  # Modifying Channel ID's to incorrect Id's will stop the program from working
         self.channelName = channelName
         self.subscribers = subscribers
-        self.views = view
+        self.view = view
         self.totalVideos = totalVideos
         self._playlistId = playlistId  # Modifying Playlist ID's to incorrect Id's will stop the program from working
 
@@ -62,6 +64,12 @@ class YoutubeChannel:
             elif not isinstance(channel_id, str):
                 raise ValueError('Channel ID is of invalid datatype!')
 
+    def calculate_subscribers_per_hundredk(self):
+        '''
+        Calculates the number of subscribers per hundred thousand, and adds it as an attribute to the instance
+        '''
+        self.subscribers_per_hundredk = self.subscribers // 100000
+
     def get_channel_stats(self, channel_ids):
         """
         Get channel statistics: title, subscriber count, view count, video count, upload playlist
@@ -74,21 +82,26 @@ class YoutubeChannel:
         """
         self._validate_channel_ids(channel_ids)  # Calls the private method to validate channel ids.
 
-        all_data = []
+        channel_info = []
         request = self._youtube.channels().list(
             part='snippet,contentDetails,statistics',
             id=','.join(channel_ids))
         response = request.execute()
 
         for i in range(len(response['items'])):
-            data = dict(channelName=response['items'][i]['snippet']['title'],
-                        subscribers=response['items'][i]['statistics']['subscriberCount'],
-                        views=response['items'][i]['statistics']['viewCount'],
-                        totalVideos=response['items'][i]['statistics']['videoCount'],
-                        playlistId=response['items'][i]['contentDetails']['relatedPlaylists']['uploads'])
-            all_data.append(data)
+            data = YoutubeChannel(channelName=response['items'][i]['snippet']['title'],
+                                  subscribers=response['items'][i]['statistics']['subscriberCount'],
+                                  view=response['items'][i]['statistics']['viewCount'],
+                                  totalVideos=response['items'][i]['statistics']['videoCount'],
+                                  playlistId=response['items'][i]['contentDetails']['relatedPlaylists']['uploads'])
 
-        return pd.DataFrame(all_data)
+            data.view = int(data.view)
+            data.subscribers = int(data.subscribers)
+            data.totalVideos = int(data.totalVideos)
+
+            channel_info.append(data)
+
+        return pd.DataFrame([vars(channel) for channel in channel_info])
 
     def get_video_ids(self, playlist_id):
         """
@@ -131,5 +144,3 @@ class YoutubeChannel:
                 next_page_token = response.get('nextPageToken')
 
         return video_ids
-
-

@@ -1,4 +1,6 @@
+import isodate
 import pandas as pd
+
 
 class YoutubeVideo:
     """
@@ -26,7 +28,8 @@ class YoutubeVideo:
         - `get_video_details(self, video_ids)`: Retrieves detailed statistics and information for a given list of video IDs. Returns a Pandas DataFrame containing the data.
         - `get_comments_in_videos(self, video_ids)`: Retrieves top-level comments (up to 10) as text for a given list of video IDs. Returns a Pandas DataFrame containing the data.
         """
-    def __init__(self, youtube, video_id=None, channelTitle=None, title=None, description=None, tags=None,
+
+    def __init__(self, youtube=None, video_id=None, channelTitle=None, title=None, description=None, tags=None,
                  publishedAt=None, viewCount=None, likeCount=None, favoriteCount=None, commentCount=None, duration=None,
                  definition=None, caption=None):
         """
@@ -49,6 +52,12 @@ class YoutubeVideo:
          - `definition` (str, optional): Video definition (e.g., "sd", "hd", "fullhd").
          - `caption` (str, optional): Whether captions are available for the video.
          """
+        self.dayPublishedAt = None
+        self.titleLength = None
+        self.likeRatio = None
+        self.tagCount = None
+        self.durationSecs = None
+        self.commentRatio = None
         self._youtube = youtube  # Required to make requests to the API, modification could cause the program to stop running.
         self._video_id = video_id  # Modifying Video ID's to incorrect ID's will stop the program from working
         self.channelTitle = channelTitle
@@ -79,6 +88,44 @@ class YoutubeVideo:
                 raise ValueError('Video ID cannot be empty!')
             elif not isinstance(video_ids, str):
                 raise ValueError('Video ID is of invalid datatype!')
+
+    def day_published(self):
+        self.publishedAt = parser.parse(self.publishedAt)
+        self.dayPublishedAt = self.publishedAt.strftime('%A')
+
+    def calculate_duration_seconds(self):
+        '''
+        Converts the video duration from the propietary format, into seconds
+        '''
+        self.durationSecs = isodate.parse_duration(self.duration).total_seconds()
+
+    def calculate_tags_count(self):
+        '''
+        Converts the number of tags associated with the video
+        '''
+        self.tagCount = len(self.tags) if self.tags else 0
+
+    def calculate_like_ratio(self):
+        '''
+        Converts the video duration from the propietary format, into seconds
+        '''
+        if self.viewCount == 0 or self.likeCount == 0:
+            self.likeRatio = 0
+        else:
+            self.likeRatio = (self.likeCount / self.viewCount) * 1000
+
+    def calculate_comment_ratio(self):
+        '''
+        Calculates the Comment to View Ratio, per thousand views
+        '''
+        self.commentRatio = (self.commentCount / self.viewCount) * 1000 if self.commentCount or self.viewCount else 0
+
+    def calculate_title_length(self):
+        '''
+        Calculates Length of the Title, inclusive of spaces
+        '''
+        self.titleLength = len(self.title)
+
     def get_video_details(self, video_ids):
         """
         Get video statistics of all videos with given IDs
@@ -103,23 +150,27 @@ class YoutubeVideo:
             response = request.execute()
 
             for video in response['items']:
-                stats_to_keep = {'snippet': ['channelTitle', 'title', 'description', 'tags', 'publishedAt'],
-                                 'statistics': ['viewCount', 'likeCount', 'favoriteCount', 'commentCount'],
-                                 'contentDetails': ['duration', 'definition', 'caption']
-                                 }
-                video_info = {}
-                video_info['video_id'] = video['id']
+                stats_to_keep = YoutubeVideo(channelTitle=video['snippet']['channelTitle'],
+                                             title=video['snippet']['title'],
+                                             description=video['snippet']['description'],
+                                             tags=video['snippet'].get('tags', []), # Handle any missing values
+                                             publishedAt=video['snippet']['publishedAt'],
+                                             viewCount=video['statistics']['viewCount'],
+                                             likeCount=video['statistics'].get('likeCount', 0), # Handle any missing values
+                                             favoriteCount=video['statistics']['favoriteCount'],
+                                             commentCount=video['statistics'].get('commentCount', 0), # Handle any missing values
+                                             duration=video['contentDetails']['duration'],
+                                             definition=video['contentDetails']['definition'],
+                                             caption=video['contentDetails']['caption'])
 
-                for k in stats_to_keep.keys():
-                    for v in stats_to_keep[k]:
-                        try:
-                            video_info[v] = video[k][v]
-                        except:
-                            video_info[v] = None
+                stats_to_keep.viewCount = int(stats_to_keep.viewCount)
+                stats_to_keep.likeCount = int(stats_to_keep.likeCount)
+                stats_to_keep.favoriteCount = int(stats_to_keep.favoriteCount)
+                stats_to_keep.commentCount = int(stats_to_keep.commentCount)
 
-                all_video_info.append(video_info)
+                all_video_info.append(stats_to_keep)
 
-        return pd.DataFrame(all_video_info)
+        return pd.DataFrame([vars(video) for video in all_video_info])
 
     def get_comments_in_videos(self, video_ids):
         """
