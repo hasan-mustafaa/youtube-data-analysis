@@ -1,19 +1,15 @@
-from dateutil import parser
-import pandas as pd
-import isodate
-
-# Data visualization libraries
-import seaborn as sns
-
-sns.set(style="darkgrid", color_codes=True)
-
 # Google API
 from googleapiclient.discovery import build
-
 # Importing Classes
 from youtube_channel import YoutubeChannel
 from youtube_video import YoutubeVideo
-
+from shorts import YoutubeShorts
+from longform import YoutubeLongForm
+# Import Data Analysis Libraries
+import pandas as pd
+# Data visualization libraries
+import seaborn as sns
+sns.set(style="darkgrid", color_codes=True)
 
 api_key = 'AIzaSyAUQfbrbRO2VDhHLuQcfVBTk6QQKmyHiPs'
 
@@ -31,74 +27,137 @@ channel_ids = ['UCtYLUTtgS3k1Fg4y5tAhLbw',  # Statquest
 
 youtube = build('youtube', 'v3', developerKey=api_key)
 
-# Creates an instance of the 'YoutubeMetrics' Class passing the youtube object
+# Creates an instance of the 'YoutubeMetrics' Class passing the YouTube object
 channel_metrics = YoutubeChannel(youtube)
 video_metrics = YoutubeVideo(youtube)
 # Uses a method from the class, to retrieve statistics using the channel id's in the array
 channel_data = channel_metrics.get_channel_stats(channel_ids)
 
-# Convert count columns which were originally contain string values to numeric columns which is required for analysis
-numeric_cols = ['subscribers', 'views', 'totalVideos']
-channel_data[numeric_cols] = channel_data[numeric_cols].apply(pd.to_numeric, errors='coerce') #String to Numeric(Either Int or Float)
-
-# Tells us which playbutton they might have using comparisons
-subscribers_per_hundredk = channel_data['subscribers'] // 100000
-channel_data['subscribers_per_hundredk'] = subscribers_per_hundredk
+# Understand how it works
+for position, series in channel_data.iterrows():
+    # Converts row to dictionary, and creates a Youtube Channel instance
+    channel_instance = YoutubeChannel(
+        youtube=youtube,
+        channelName=series['channelName'],
+        subscribers=series['subscribers'],
+        view=series['view'],
+        totalVideos=series['totalVideos'],
+        playlistId=series['_playlistId']
+    )
+    # Now subscriberss per hundredk can be calculated
+    channel_instance.calculate_subscribers_per_hundredk()
+    channel_data.at[position, 'subscribers_per_hundredk'] = channel_instance.subscribers_per_hundredk
 
 # Converts the data from channel_data to a csv
 channel_data.to_csv('channel_data.csv', index=False)
 print(channel_data)
 
-
 # Create a dataframe with video statistics and comments from all channels
 video_df = pd.DataFrame()  # Create an empty DataFrame for cumulative results
 
-
 '''
 Loops through each unique channel name in the channel name column. It outputs the name of the channel being processed.
-Retrives the playlist_id of each channel  then passed it through a method which retrieves the list of video_ids.
+Retrieves the playlist_id of each channel  then passed it through a method which retrieves the list of video_ids.
 It then uses the video_ids to find details of each video, e.g. Description, Views etc
 Last line concatenates the Video data from all channels
 '''
-for c in channel_data['channelName'].unique():
-    print("Getting video information from channel: " + c)
-    playlist_id = channel_data.loc[channel_data['channelName'] == c, 'playlistId'].iloc[0]
+
+for channel in channel_data['channelName'].unique():
+    print("Getting video information from channel: " + channel)
+    playlist_id = channel_data.loc[channel_data['channelName'] == channel, '_playlistId'].iloc[0]
     video_ids = channel_metrics.get_video_ids(playlist_id)
     # Get video data for the current channel efficiently
     current_video_data = video_metrics.get_video_details(video_ids)
     # Concatenate the current video data with the cumulative DataFrame
     video_df = pd.concat([video_df, current_video_data], ignore_index=True)
 
-# Converts column with string representation to numeric for analysis
-cols = ['viewCount', 'likeCount', 'favoriteCount', 'commentCount']
-video_df[cols] = video_df[cols].apply(pd.to_numeric, errors='coerce', axis=1) #String to Numeric
-
-# Create publish day (in the week) column
-'''
-First line parses timestamps into datetime objects representing date and time of video publications
-Second line, creates a new column and extracts the day of the week that it was published
-'''
-video_df['publishedAt'] = video_df['publishedAt'].apply(lambda x: parser.parse(x)) #String to Datetime
-video_df['pushblishDayName'] = video_df['publishedAt'].apply(lambda x: x.strftime("%A"))
-
-# Convert duration to seconds
-'''
-First line parses the string of duration e.g. 'PT6M49S' into Pandas TimeDelta Datetime. 
-Second line parsed durations to specific units of seconds
-'''
-video_df['durationSecs'] = video_df['duration'].apply(lambda x: isodate.parse_duration(x))
-video_df['durationSecs'] = video_df['durationSecs'].astype('timedelta64[s]') #String to Pandas TimeDelta Datetime
-
-# Add number of tags
-video_df['tagsCount'] = video_df['tags'].apply(lambda x: 0 if x is None else len(x))
-
-# Comments and likes per 1000 view ratio
-video_df['likeRatio'] = video_df['likeCount'] / video_df['viewCount'] * 1000
-video_df['commentRatio'] = video_df['commentCount'] / video_df['viewCount'] * 1000
-
-# Title character length
-video_df['titleLength'] = video_df['title'].apply(lambda x: len(x)) #Converting String to Integer
+for position, series in video_df.iterrows():
+    video_instance = YoutubeVideo(
+        youtube=youtube,
+        channelTitle=series['channelTitle'],
+        title=series['title'],
+        description=series['description'],
+        tags=series['tags'],  # Gracefully handles where there is no value
+        publishedAt=series['publishedAt'],
+        viewCount=series['viewCount'],
+        likeCount=series['likeCount'],  # Gracefully handles where there is no value
+        favoriteCount=series['favoriteCount'],
+        commentCount=series['commentCount'],  # Gracefully handles where there is no value
+        duration=series['duration'],
+        definition=series['definition'],
+        caption=series['caption']
+    )
+    video_instance.calculate_duration_seconds()
+    video_df.at[position, 'durationSecs'] = video_instance.durationSecs
+    video_instance.calculate_tags_count()
+    video_df.at[position, 'tagsCount'] = video_instance.tagCount
+    video_instance.calculate_like_ratio()
+    video_df.at[position, 'likeRatio'] = video_instance.likeRatio
+    video_instance.calculate_comment_ratio()
+    video_df.at[position, 'commentRatio'] = video_instance.commentRatio
+    video_instance.calculate_title_length()
+    video_df.at[position, 'titleLength'] = video_instance.titleLength
 
 # Output the DataFrame directly
 print(video_df)
 video_df.to_csv('video_data.csv', index=False)
+
+
+shorts_info = []
+longform_info = []
+shorts_df = pd.DataFrame()
+longform_df = pd.DataFrame()
+
+for position, series in video_df.iterrows():
+    if series['durationSecs'] <= 60:
+        shorts_instance = YoutubeShorts(youtube=youtube, video_ids=video_ids, channelTitle=series['channelTitle'], title=series['title'],
+                                        description=series['description'],
+                                        tags=series['tags'], publishedAt=series['publishedAt'],
+                                        viewCount=series['viewCount'], likeCount=series['likeCount'],
+                                        favoriteCount=series['favoriteCount'], commentCount=series['commentCount'],
+                                        duration=series['duration'],
+                                        definition=series['definition'], caption=series['caption'],
+                                        dayPublishedAt=series['dayPublishedAt'], titleLength=series['titleLength'],
+                                        likeRatio=series['likeRatio'], commentRatio=series['commentRatio'],
+                                        durationSecs=series['durationSecs'])
+        shorts_instance.popular_video()
+        shorts_df.at[position, 'videoPopularity'] = shorts_instance.videoPopularity
+        shorts_instance.video_feedback()
+        shorts_df.at[position, 'videoFeedback'] = shorts_instance.videoFeedback
+        shorts_instance.comment_engagement()
+        shorts_df.at[position, 'commentEngagement'] = shorts_instance.commentEngagement
+        shorts_instance.like_engagement()
+        shorts_df.at[position, 'likeEngagement'] = shorts_instance.likeEngagement
+        shorts_info.append(shorts_instance)
+    elif series['durationSecs'] > 60:
+        longform_instance = YoutubeLongForm(channelTitle=series['channelTitle'], title=series['title'],
+                                            description=series['description'],
+                                            tags=series['tags'], publishedAt=series['publishedAt'],
+                                            viewCount=series['viewCount'], likeCount=series['likeCount'],
+                                            favoriteCount=series['favoriteCount'], commentCount=series['commentCount'],
+                                            duration=series['duration'],
+                                            definition=series['definition'], caption=series['caption'],
+                                            dayPublishedAt=series['dayPublishedAt'], titleLength=series['titleLength'],
+                                            likeRatio=series['likeRatio'], commentRatio=series['commentRatio'],
+                                            durationSecs=series['durationSecs'])
+        longform_instance.popular_video()
+        longform_df.at[position, 'videoPopularity'] = longform_instance.videoPopularity
+        longform_instance.video_feedback()
+        longform_df.at[position, 'videoFeedback'] = longform_instance.videoFeedback
+        longform_instance.comment_engagement()
+        longform_df.at[position, 'commentEngagement'] = longform_instance.commentEngagement
+        longform_instance.like_engagement()
+        longform_df.at[position, 'likeEngagement'] = longform_instance.likeEngagement
+        longform_info.append(longform_instance)
+
+shorts_df = pd.DataFrame([vars(short) for short in shorts_info])
+print(shorts_df)
+shorts_df.to_csv('shorts_data.csv', index=False)
+
+longform_df = pd.DataFrame([vars(longform) for longform in longform_info])
+print(longform_df)
+longform_df.to_csv('longform_vido_data.csv', index=False)
+
+
+#Fix TagCount and PublishedAt
+#Includ Visualisation
