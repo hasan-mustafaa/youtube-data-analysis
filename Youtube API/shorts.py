@@ -104,5 +104,3 @@ class YoutubeShorts(YoutubeVideo):
             self.likeEngagement = 'Low Like Engagement'
         else:
             self.likeEngagement = 'Not Well Received'
-
-

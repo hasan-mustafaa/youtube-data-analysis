@@ -103,44 +103,39 @@ class YoutubeChannel:
 
         return pd.DataFrame([vars(channel) for channel in channel_info])
 
-    def get_video_ids(self, playlist_id):
+    def get_video_ids(self, playlist_id, page_token=None):
         """
-        Get list of video IDs of all videos in the given playlist
+        Get list of video IDs of all videos in the given playlist, using recusion
         Params:
 
         playlist_id: playlist ID of the channel
+        page_token: Checks whether there is more pages
 
         Returns:
         List of video IDs of all videos in the playlist
         """
-        request = self._youtube.playlistItems().list(
-            part='contentDetails',
-            playlistId=playlist_id,
-            maxResults=50)
+
+        if page_token is None:
+            request = self._youtube.playlistItems().list(
+                part='contentDetails',
+                playlistId=playlist_id,
+                maxResults=50)
+        else:
+            request = self._youtube.playlistItems().list(
+                part='contentDetails',
+                playlistId=playlist_id,
+                maxResults=50,
+                pageToken=page_token)
+
         response = request.execute()
+        video_ids = [item['contentDetails']['videoId'] for item in response['items']]
 
-        video_ids = []
-
-        for i in range(len(response['items'])):
-            video_ids.append(response['items'][i]['contentDetails']['videoId'])
-
-        next_page_token = response.get('nextPageToken')
-        more_pages = True
-
-        while more_pages:
-            if next_page_token is None:
-                more_pages = False
-            else:
-                request = self._youtube.playlistItems().list(
-                    part='contentDetails',
-                    playlistId=playlist_id,
-                    maxResults=50,
-                    pageToken=next_page_token)
-                response = request.execute()
-
-                for i in range(len(response['items'])):
-                    video_ids.append(response['items'][i]['contentDetails']['videoId'])
-
-                next_page_token = response.get('nextPageToken')
-
+        check_next_page_token = response.get('nextPageToken')
+        if check_next_page_token:
+            video_ids.extend(self.get_video_ids(playlist_id, check_next_page_token))
         return video_ids
+
+
+
+
+
