@@ -1,10 +1,10 @@
-channelName,subscribers,views,totalVideos,playlistId,subscribers_per_hundredk
-StatQuest with Josh Starmer,1120000,61005785,268,UUtYLUTtgS3k1Fg4y5tAhLbw,11
-sentdex,1300000,113743224,1254,UUfzlCWGWYyIQ0aLC5w48gBQ,13
-Data Science Dojo,103000,5864532,489,UUzL_0nIe8B4-7ShhVPfJkgw,1
-Corey Schafer,1280000,93353054,233,UUCezIgC97PvUuR4_gbFUs5g,12
-Alex The Analyst,720000,31116355,290,UU7cs8q-gJRlGwj4A8OmCmXg,7
-Krish Naik,901000,91742403,1822,UUNU_lfiiWBdtULKOw6X0Dig,9
-Tina Huang,622000,28922531,200,UU2UXDak6o7rBm23k3Vv5dww,6
-Luke Barousse,420000,20915646,154,UULLw7jmFsvfIVaUFsLs8mlQ,4
-Ken Jee,257000,8867832,286,UUiT9RITQ9PW6BhXK0y2jaeg,2
+subscribers_per_hundredk,_youtube,_channel_ids,channelName,subscribers,view,totalVideos,_playlistId
+13,,,sentdex,1320000,114436265,1254,UUfzlCWGWYyIQ0aLC5w48gBQ
+11,,,StatQuest with Josh Starmer,1160000,63988791,274,UUtYLUTtgS3k1Fg4y5tAhLbw
+6,,,Tina Huang,649000,30341813,215,UU2UXDak6o7rBm23k3Vv5dww
+9,,,Krish Naik,941000,96464213,1879,UUNU_lfiiWBdtULKOw6X0Dig
+2,,,Ken Jee,259000,8959097,287,UUiT9RITQ9PW6BhXK0y2jaeg
+13,,,Corey Schafer,1300000,94834277,235,UUCezIgC97PvUuR4_gbFUs5g
+7,,,Alex The Analyst,765000,33638936,302,UU7cs8q-gJRlGwj4A8OmCmXg
+1,,,Data Science Dojo,105000,5960627,523,UUzL_0nIe8B4-7ShhVPfJkgw
+4,,,Luke Barousse,433000,21676486,157,UULLw7jmFsvfIVaUFsLs8mlQ
